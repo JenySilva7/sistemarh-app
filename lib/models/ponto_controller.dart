@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../services/ponto_service.dart';
+import '../utils/horario_brasilia.dart';
 
 /// As 4 marcações do dia (entrada, saída pro almoço, volta do almoço,
 /// saída final). O rótulo exibido é sempre só "Entrada" ou "Saída" —
@@ -90,13 +91,13 @@ class PontoController extends ChangeNotifier {
   int get minutosTrabalhados {
     final entrada = _registros[TipoRegistro.entrada];
     if (entrada == null) return 0;
-    final fim = _registros[TipoRegistro.saida] ?? DateTime.now();
+    final fim = _registros[TipoRegistro.saida] ?? agoraBrasilia();
     var total = fim.difference(entrada).inSeconds / 60.0;
 
     final saidaAlmoco = _registros[TipoRegistro.saidaAlmoco];
     final voltaAlmoco = _registros[TipoRegistro.voltaAlmoco];
     if (saidaAlmoco != null) {
-      final fimAlmoco = voltaAlmoco ?? DateTime.now();
+      final fimAlmoco = voltaAlmoco ?? agoraBrasilia();
       if (fimAlmoco.isAfter(saidaAlmoco)) {
         total -= fimAlmoco.difference(saidaAlmoco).inSeconds / 60.0;
       }

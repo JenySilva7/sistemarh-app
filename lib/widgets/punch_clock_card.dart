@@ -4,6 +4,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../models/ponto_controller.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
+import '../utils/horario_brasilia.dart';
 import 'status_chip.dart';
 
 /// Card do Relógio — relógio ao vivo, status do expediente, progresso da
@@ -25,10 +26,10 @@ class _PunchClockCardState extends State<PunchClockCard> {
   @override
   void initState() {
     super.initState();
-    _now = DateTime.now();
+    _now = agoraBrasilia();
     _tick = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
-      final agora = DateTime.now();
+      final agora = agoraBrasilia();
       if (agora.hour != _now.hour || agora.minute != _now.minute) {
         setState(() => _now = agora);
       }

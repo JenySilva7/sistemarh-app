@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/ponto_controller.dart';
+import '../utils/horario_brasilia.dart';
 import 'api_config.dart';
 
 const String _baseUrl = apiBaseUrl;
@@ -26,7 +27,7 @@ class RegistroPontoApi {
       // saida) é a mesma de TipoRegistroPonto no backend (0..3) — dá pra
       // mapear direto pelo índice.
       tipo: TipoRegistro.values[json['tipo'] as int],
-      registradoEm: DateTime.parse(json['registradoEm'] as String).toLocal(),
+      registradoEm: paraBrasilia(DateTime.parse(json['registradoEm'] as String)),
     );
   }
 }
