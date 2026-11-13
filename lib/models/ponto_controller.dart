@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../services/api_client.dart';
 import '../services/ponto_service.dart';
 import '../utils/horario_brasilia.dart';
 
@@ -25,9 +26,9 @@ extension TipoRegistroLabel on TipoRegistro {
 /// ponto, o horário é definitivo (reflete como ponto eletrônico funciona na
 /// vida real, e é assim que o backend trata isso também).
 class PontoController extends ChangeNotifier {
-  PontoController({required String token}) : _token = token {
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) => notifyListeners());
-    _carregarDeHoje();
+  PontoController({required String token, this.onSessaoExpirada}) : _token = token {
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) => _notificar());
+    recarregar();
   }
 
   static const escalaInicio = TimeOfDay(hour: 8, minute: 0);
@@ -36,6 +37,10 @@ class PontoController extends ChangeNotifier {
 
   final String _token;
   final PontoService _service = PontoService();
+
+  /// Chamado quando o servidor recusa o token ao carregar os registros.
+  final VoidCallback? onSessaoExpirada;
+  bool _descartado = false;
 
   final Map<TipoRegistro, DateTime?> _registros = {
     TipoRegistro.entrada: null,
@@ -47,11 +52,12 @@ class PontoController extends ChangeNotifier {
   Timer? _timer;
   bool _carregando = true;
   String? _erroCarregamento;
+  int _registrosFeitos = 0;
 
   /// true enquanto a busca inicial dos registros de hoje ainda não terminou.
   bool get carregando => _carregando;
 
-  /// Mensagem de erro da busca inicial, se ela falhar (ex.: backend fora do
+  /// Mensagem de erro da última busca, se ela falhar (ex.: backend fora do
   /// ar) — o usuário ainda consegue tentar registrar, que vai falhar com o
   /// próprio erro de conexão nessa hora.
   String? get erroCarregamento => _erroCarregamento;
@@ -117,34 +123,55 @@ class PontoController extends ChangeNotifier {
     return '${h}h${m.toString().padLeft(2, '0')}';
   }
 
-  Future<void> _carregarDeHoje() async {
+  /// Busca (de novo) os registros de hoje no backend. Usado ao abrir o app e
+  /// no "puxar pra atualizar" — nesse caso sem voltar pro estado de
+  /// carregamento, pra tela não piscar.
+  Future<void> recarregar() async {
+    final registrosAntes = _registrosFeitos;
     try {
       final registros = await _service.listarDeHoje(_token);
+      // Se um ponto foi batido enquanto a busca rolava, a lista que chegou já
+      // está velha — aplicar apagaria o registro novo da tela.
+      if (registrosAntes != _registrosFeitos) return;
+      // Zera antes de preencher: se virou o dia, os registros de ontem somem.
+      for (final tipo in TipoRegistro.values) {
+        _registros[tipo] = null;
+      }
       for (final r in registros) {
         _registros[r.tipo] = r.registradoEm;
       }
       _erroCarregamento = null;
-    } on PontoApiException catch (e) {
+    } on SessaoExpiradaException {
+      onSessaoExpirada?.call();
+    } on ApiException catch (e) {
       _erroCarregamento = e.mensagem;
+    } catch (_) {
+      _erroCarregamento = mensagemErroInesperado;
     } finally {
       _carregando = false;
-      notifyListeners();
+      _notificar();
     }
+  }
+
+  void _notificar() {
+    if (!_descartado) notifyListeners();
   }
 
   /// Registra o próximo ponto pendente contra a API e retorna uma mensagem
   /// de toast, ou null se a jornada já estava concluída. Lança
-  /// [PontoApiException] em caso de erro — quem chama decide como mostrar.
+  /// [ApiException] (ou [SessaoExpiradaException]) em caso de erro — quem
+  /// chama decide como mostrar.
   Future<String?> registrarProximo() async {
     if (proximo == null) return null;
     final registro = await _service.registrarProximo(_token);
+    _registrosFeitos++;
     _registros[registro.tipo] = registro.registradoEm;
     final hora = TimeOfDay.fromDateTime(registro.registradoEm).format24();
     final dia = _diaSemanaCurto(registro.registradoEm.weekday);
     final msg = registro.tipo == TipoRegistro.saida
         ? 'Saída às $hora · $dia'
         : '${registro.tipo.titulo} registrada às $hora';
-    notifyListeners();
+    _notificar();
     return msg;
   }
 
@@ -162,6 +189,7 @@ class PontoController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _descartado = true;
     _timer?.cancel();
     super.dispose();
   }

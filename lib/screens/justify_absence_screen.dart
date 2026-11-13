@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../services/api_client.dart';
 import '../services/ausencia_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
@@ -25,7 +26,10 @@ const _tipos = [
 class JustifyAbsenceScreen extends StatefulWidget {
   final String token;
 
-  const JustifyAbsenceScreen({super.key, required this.token});
+  /// Chamado se o servidor recusar o token ao enviar.
+  final VoidCallback onSessaoExpirada;
+
+  const JustifyAbsenceScreen({super.key, required this.token, required this.onSessaoExpirada});
 
   @override
   State<JustifyAbsenceScreen> createState() => _JustifyAbsenceScreenState();
@@ -105,8 +109,12 @@ class _JustifyAbsenceScreenState extends State<JustifyAbsenceScreen> {
       );
       if (!mounted) return;
       Navigator.of(context).pop(true);
-    } on AusenciaApiException catch (e) {
-      _avisar(e.mensagem);
+    } on SessaoExpiradaException {
+      widget.onSessaoExpirada();
+    } on ApiException catch (e) {
+      if (mounted) _avisar(e.mensagem);
+    } catch (_) {
+      if (mounted) _avisar(mensagemErroInesperado);
     } finally {
       if (mounted) setState(() => _enviando = false);
     }

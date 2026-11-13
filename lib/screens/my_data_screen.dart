@@ -2,17 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../services/auth_service.dart';
 import '../theme/app_colors.dart';
+import '../utils/formatters.dart';
+import '../utils/horario_brasilia.dart';
 import '../widgets/grouped_info.dart';
 import '../widgets/profile_header.dart';
 import '../widgets/resumo_perfil_card.dart';
 
-/// Tela "Meus Dados" — perfil do colaborador com informações pessoais e de
-/// contato. Cargo, tempo de casa e gestor já aparecem no card de resumo
-/// acima, então não se repetem aqui.
-///
-/// Nome, e-mail, cargo/departamento e banco de horas vêm do backend (sessão
-/// autenticada); os demais campos (CPF, telefone, endereço etc.) ainda não
-/// existem no modelo da API, então seguem como dados de exemplo fixos.
+/// Tela "Meus Dados" — perfil do colaborador. Tudo vem do backend (sessão
+/// autenticada): o que a API ainda não fornece (CPF, telefone, endereço...)
+/// simplesmente não aparece, e o que o RH ainda não preencheu (admissão,
+/// gestor) aparece como "—" — nunca com valores de exemplo.
 class MyDataScreen extends StatelessWidget {
   final Sessao sessao;
   final VoidCallback onSair;
@@ -22,6 +21,9 @@ class MyDataScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cargoDepartamento = [sessao.cargo, sessao.departamento].where((s) => s.isNotEmpty).join(' · ');
+    final admissao = sessao.dataAdmissao;
+    final agora = agoraBrasilia();
+    final hoje = DateTime(agora.year, agora.month, agora.day);
 
     return ListView(
       padding: EdgeInsets.zero,
@@ -29,7 +31,7 @@ class MyDataScreen extends StatelessWidget {
         ProfileHeader(
           nome: sessao.nome,
           cargoDepartamento: cargoDepartamento.isEmpty ? 'Colaborador' : cargoDepartamento,
-          desde: 'Na empresa desde 01/06/2020',
+          desde: admissao == null ? 'Data de admissão não informada' : 'Na empresa desde ${formatarData(admissao)}',
           initials: sessao.iniciais,
         ),
         Transform.translate(
@@ -37,8 +39,8 @@ class MyDataScreen extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: ResumoPerfilCard(
-              tempoDeCasa: '6 anos',
-              gestor: 'Maria Santos',
+              tempoDeCasa: admissao == null ? '—' : formatarTempoDeCasa(admissao, hoje),
+              gestor: sessao.gerenteNome ?? '—',
               bancoDeHoras: sessao.bancoDeHorasFormatado,
             ),
           ),
@@ -69,13 +71,15 @@ class MyDataScreen extends StatelessWidget {
   }
 
   Widget _buildInformacoes() {
+    String ouTraco(String valor) => valor.trim().isEmpty ? '—' : valor;
+
     return InfoGroup(
       titulo: 'Dados pessoais',
       campos: [
         InfoField(LucideIcons.user, 'Nome completo', sessao.nome),
         InfoField(LucideIcons.mail, 'E-mail', sessao.email),
-        const InfoField(LucideIcons.hash, 'CPF', '123.456.789-00'),
-        const InfoField(LucideIcons.phone, 'Telefone', '(11) 98765-4321'),
+        InfoField(LucideIcons.briefcase, 'Cargo', ouTraco(sessao.cargo)),
+        InfoField(LucideIcons.building2, 'Departamento', ouTraco(sessao.departamento)),
       ],
     );
   }
