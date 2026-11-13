@@ -6,4 +6,4 @@
 /// emulador. Como é um túnel "quick" (gratuito, sem conta), a URL muda toda
 /// vez que o túnel é reiniciado; se parar de funcionar, é só pedir uma nova
 /// URL e atualizar essa constante.
-const String apiBaseUrl = 'https://helen-met-talk-points.trycloudflare.com';
+const String apiBaseUrl = 'https://solved-dish-observer-mix.trycloudflare.com';

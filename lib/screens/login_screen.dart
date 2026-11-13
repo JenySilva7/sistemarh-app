@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../services/api_client.dart';
 import '../services/auth_service.dart';
 import '../services/session_storage.dart';
 import '../theme/app_colors.dart';
@@ -9,7 +10,10 @@ import 'root_shell.dart';
 /// Tela de login: autentica contra o backend (.NET) e, em caso de sucesso,
 /// abre o app de verdade ([RootShell]) com os dados do usuário logado.
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  /// Aviso exibido ao abrir a tela (ex.: sessão expirada, acesso desativado).
+  final String? mensagemInicial;
+
+  const LoginScreen({super.key, this.mensagemInicial});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -24,6 +28,12 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _carregando = false;
   String? _erro;
   bool _mostrarSenha = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _erro = widget.mensagemInicial;
+  }
 
   @override
   void dispose() {
@@ -50,8 +60,10 @@ class _LoginScreenState extends State<LoginScreen> {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => RootShell(sessao: sessao)),
       );
-    } on AuthException catch (e) {
-      setState(() => _erro = e.mensagem);
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _erro = e.mensagem);
+    } catch (_) {
+      if (mounted) setState(() => _erro = mensagemErroInesperado);
     } finally {
       if (mounted) setState(() => _carregando = false);
     }

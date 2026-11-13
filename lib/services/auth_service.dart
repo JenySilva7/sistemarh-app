@@ -1,8 +1,5 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
-import 'api_config.dart';
-
-const String _baseUrl = apiBaseUrl;
+import '../utils/horario_brasilia.dart';
+import 'api_client.dart';
 
 /// Dados do usuário autenticado, exatamente como a API devolve.
 class Sessao {
@@ -13,6 +10,12 @@ class Sessao {
   final String cargo;
   final String departamento;
   final int saldoBancoHorasMinutos;
+  final int? funcionarioId;
+
+  /// Data de calendário (sem fuso) — null se o RH ainda não informou.
+  final DateTime? dataAdmissao;
+  final String? gerenteNome;
+  final int totalSolicitacoesAusencia;
 
   const Sessao({
     required this.token,
@@ -22,25 +25,27 @@ class Sessao {
     required this.cargo,
     required this.departamento,
     required this.saldoBancoHorasMinutos,
+    this.funcionarioId,
+    this.dataAdmissao,
+    this.gerenteNome,
+    this.totalSolicitacoesAusencia = 0,
   });
 
+  /// Monta a sessão a partir da resposta do login (`{ token, usuario }`).
   factory Sessao.fromJson(Map<String, dynamic> json) {
-    final usuario = json['usuario'] as Map<String, dynamic>;
-    return Sessao(
-      token: json['token'] as String,
-      id: usuario['id'] as int,
-      nome: usuario['nome'] as String,
-      email: usuario['email'] as String,
-      cargo: usuario['cargo'] as String? ?? '',
-      departamento: usuario['departamento'] as String? ?? '',
-      saldoBancoHorasMinutos: usuario['saldoBancoHorasMinutos'] as int? ?? 0,
-    );
+    return Sessao.fromUsuarioJson(json['token'] as String, json['usuario'] as Map<String, dynamic>);
   }
 
   /// Monta a sessão a partir da resposta de `GET /api/auth/me`, que devolve
   /// só os dados do usuário (sem token — por isso ele é passado à parte,
   /// vindo do token já salvo localmente).
+  ///
+  /// Os campos mais novos (funcionário, admissão, gerente) são lidos de forma
+  /// tolerante: um servidor desatualizado pode simplesmente não mandá-los.
   factory Sessao.fromUsuarioJson(String token, Map<String, dynamic> json) {
+    final funcionarioId = json['funcionarioId'];
+    final gerenteNome = json['gerenteNome'];
+    final totalAusencias = json['totalSolicitacoesAusencia'];
     return Sessao(
       token: token,
       id: json['id'] as int,
@@ -49,6 +54,10 @@ class Sessao {
       cargo: json['cargo'] as String? ?? '',
       departamento: json['departamento'] as String? ?? '',
       saldoBancoHorasMinutos: json['saldoBancoHorasMinutos'] as int? ?? 0,
+      funcionarioId: funcionarioId is int ? funcionarioId : null,
+      dataAdmissao: lerDataApi(json['dataAdmissao']),
+      gerenteNome: gerenteNome is String && gerenteNome.trim().isNotEmpty ? gerenteNome.trim() : null,
+      totalSolicitacoesAusencia: totalAusencias is int ? totalAusencias : 0,
     );
   }
 
@@ -70,18 +79,18 @@ class Sessao {
   }
 }
 
-/// Erro "esperado" de autenticação (credenciais inválidas, e-mail já
-/// cadastrado, etc.) — a [mensagem] já vem pronta pra mostrar na tela.
-class AuthException implements Exception {
-  final String mensagem;
-  AuthException(this.mensagem);
-}
-
-/// Fala com as rotas /api/auth do backend.
+/// Fala com as rotas /api/auth do backend. Erros chegam como [ApiException]
+/// (ou [SessaoExpiradaException], no caso de [me] com token recusado).
 class AuthService {
+  final ApiClient _api = ApiClient();
+
   Future<Sessao> login({required String email, required String senha}) async {
-    final resposta = await _post('/api/auth/login', {'email': email, 'senha': senha});
-    return Sessao.fromJson(resposta);
+    final corpo = await _api.post(
+      '/api/auth/login',
+      corpo: {'email': email, 'senha': senha},
+      mensagemPadrao: 'Não foi possível entrar. Confira seus dados e tente novamente.',
+    );
+    return lerResposta(corpo, (json) => Sessao.fromJson(json as Map<String, dynamic>));
   }
 
   Future<Sessao> registrar({
@@ -89,57 +98,24 @@ class AuthService {
     required String email,
     required String senha,
   }) async {
-    final resposta = await _post('/api/auth/register', {
-      'nome': nome,
-      'email': email,
-      'senha': senha,
-    });
-    return Sessao.fromJson(resposta);
+    final corpo = await _api.post(
+      '/api/auth/register',
+      corpo: {'nome': nome, 'email': email, 'senha': senha},
+      mensagemPadrao: 'Não foi possível concluir o cadastro.',
+    );
+    return lerResposta(corpo, (json) => Sessao.fromJson(json as Map<String, dynamic>));
   }
 
   /// Rehidrata a sessão a partir de um token já salvo (ver [SessionStorage]),
-  /// usado ao reabrir o app. Lança [AuthException] se o token não for mais
-  /// válido (expirado, por exemplo) ou se não for possível falar com o servidor.
+  /// usado ao reabrir o app. Lança [SessaoExpiradaException] se o token não
+  /// valer mais e [ApiException] (com o [ApiException.statusCode]) nos demais
+  /// casos — quem chama decide se isso deve ou não apagar o token.
   Future<Sessao> me(String token) async {
-    http.Response resposta;
-    try {
-      resposta = await http
-          .get(
-            Uri.parse('$_baseUrl/api/auth/me'),
-            headers: {'Authorization': 'Bearer $token'},
-          )
-          .timeout(const Duration(seconds: 10));
-    } catch (_) {
-      throw AuthException('Não foi possível conectar ao servidor. Verifique se o backend está rodando.');
-    }
-
-    final json = jsonDecode(resposta.body) as Map<String, dynamic>;
-    if (resposta.statusCode >= 200 && resposta.statusCode < 300) {
-      return Sessao.fromUsuarioJson(token, json);
-    }
-
-    throw AuthException(json['mensagem'] as String? ?? 'Sessão expirada.');
-  }
-
-  Future<Map<String, dynamic>> _post(String caminho, Map<String, dynamic> corpo) async {
-    http.Response resposta;
-    try {
-      resposta = await http
-          .post(
-            Uri.parse('$_baseUrl$caminho'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode(corpo),
-          )
-          .timeout(const Duration(seconds: 10));
-    } catch (_) {
-      throw AuthException('Não foi possível conectar ao servidor. Verifique se o backend está rodando.');
-    }
-
-    final json = jsonDecode(resposta.body) as Map<String, dynamic>;
-    if (resposta.statusCode >= 200 && resposta.statusCode < 300) {
-      return json;
-    }
-
-    throw AuthException(json['mensagem'] as String? ?? 'Ocorreu um erro inesperado.');
+    final corpo = await _api.get(
+      '/api/auth/me',
+      token: token,
+      mensagemPadrao: 'Não foi possível validar sua sessão.',
+    );
+    return lerResposta(corpo, (json) => Sessao.fromUsuarioJson(token, json as Map<String, dynamic>));
   }
 }
