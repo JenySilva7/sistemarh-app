@@ -39,7 +39,7 @@ class SistemaRhApp extends StatelessWidget {
         statusBarBrightness: Brightness.dark,
       ),
       child: MaterialApp(
-        title: 'Sistema RH',
+        title: 'HumanConnect',
         debugShowCheckedModeBanner: false,
         scrollBehavior: _SemEsticarScrollBehavior(),
         theme: ThemeData(

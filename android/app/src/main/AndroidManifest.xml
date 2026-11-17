@@ -1,6 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Sem essa permissão o APK de release não acessa a rede (o login no
+         backend falha). Os manifests de debug/profile já declaram, por isso
+         o problema só aparecia no APK instalado. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
-        android:label="app_sistema_final"
+        android:label="HumanConnect"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

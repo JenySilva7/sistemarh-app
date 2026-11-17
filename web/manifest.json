@@ -1,6 +1,6 @@
 {
-    "name": "app_sistema_final",
-    "short_name": "app_sistema_final",
+    "name": "HumanConnect",
+    "short_name": "HumanConnect",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
