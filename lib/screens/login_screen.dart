@@ -99,15 +99,15 @@ class _LoginScreenState extends State<LoginScreen> {
                   children: [
                     Center(
                       child: Container(
-                        width: 140,
-                        padding: const EdgeInsets.all(12),
+                        width: 124,
                         decoration: BoxDecoration(
-                          color: AppColors.white,
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: AppColors.whiteOverlay15, width: 4),
+                          boxShadow: const [
+                            BoxShadow(color: Color(0x33000000), blurRadius: 16, offset: Offset(0, 6)),
+                          ],
                         ),
                         child: ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(20),
                           child: Image.asset('assets/images/logo_humanconnect.jpg', fit: BoxFit.contain),
                         ),
                       ),
