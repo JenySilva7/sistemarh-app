@@ -151,8 +151,6 @@ class _TalkToHrScreenState extends State<TalkToHrScreen> {
           const SizedBox(height: 8),
           AppTextField(controller: _mensagemCtrl, hint: 'Escreva sua mensagem para o RH…', maxLines: 5, maxLength: 1000),
           const SizedBox(height: 18),
-          _buildAnexo(),
-          const SizedBox(height: 18),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
@@ -174,33 +172,6 @@ class _TalkToHrScreenState extends State<TalkToHrScreen> {
               ),
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAnexo() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 18),
-      decoration: BoxDecoration(
-        color: AppColors.background,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.gray300, style: BorderStyle.solid),
-      ),
-      child: Column(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(color: AppColors.primary10, shape: BoxShape.circle),
-            alignment: Alignment.center,
-            child: const Icon(LucideIcons.paperclip, size: 20, color: AppColors.primary),
-          ),
-          const SizedBox(height: 8),
-          Text('Anexar arquivo', style: AppTextStyles.smallMedium14(color: AppColors.primary)),
-          const SizedBox(height: 2),
-          Text('PDF, JPG ou PNG · até 5 MB', style: AppTextStyles.captionRegular12()),
         ],
       ),
     );

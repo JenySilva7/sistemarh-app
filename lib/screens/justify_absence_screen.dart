@@ -39,7 +39,6 @@ class _JustifyAbsenceScreenState extends State<JustifyAbsenceScreen> {
   int _tipo = 0;
   DateTime? _data;
   bool _diaInteiro = true;
-  bool _comprovanteAnexado = false;
   bool _enviando = false;
   final _descricaoCtrl = TextEditingController();
   final _dataCtrl = TextEditingController();
@@ -159,8 +158,6 @@ class _JustifyAbsenceScreenState extends State<JustifyAbsenceScreen> {
                       'Descrição',
                       AppTextField(controller: _descricaoCtrl, hint: 'Descreva o motivo da ausência…', maxLines: 4),
                     ),
-                    const SizedBox(height: 22),
-                    _campo('Comprovante', _buildAnexo(), opcional: true),
                     const SizedBox(height: 20),
                     _buildAviso(),
                   ],
@@ -321,61 +318,6 @@ class _JustifyAbsenceScreenState extends State<JustifyAbsenceScreen> {
     );
   }
 
-  Widget _buildAnexo() {
-    if (_comprovanteAnexado) {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: AppColors.primary5,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.primary20),
-        ),
-        child: Row(
-          children: [
-            const Icon(LucideIcons.fileText, size: 18, color: AppColors.primary),
-            const SizedBox(width: 10),
-            Expanded(child: Text('comprovante.jpg', style: AppTextStyles.smallMedium14())),
-            InkWell(
-              onTap: () => setState(() => _comprovanteAnexado = false),
-              child: const Icon(LucideIcons.x, size: 18, color: AppColors.mutedForeground),
-            ),
-          ],
-        ),
-      );
-    }
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: () => setState(() => _comprovanteAnexado = true),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 18),
-          decoration: BoxDecoration(
-            color: AppColors.background,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.gray300),
-          ),
-          child: Column(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: const BoxDecoration(color: AppColors.primary10, shape: BoxShape.circle),
-                alignment: Alignment.center,
-                child: const Icon(LucideIcons.paperclip, size: 20, color: AppColors.primary),
-              ),
-              const SizedBox(height: 8),
-              Text('Anexar atestado ou comprovante', style: AppTextStyles.smallMedium14(color: AppColors.primary)),
-              const SizedBox(height: 2),
-              Text('PDF, JPG ou PNG · até 5 MB', style: AppTextStyles.captionRegular12()),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildAviso() {
     return Container(
       padding: const EdgeInsets.all(14),
@@ -387,7 +329,7 @@ class _JustifyAbsenceScreenState extends State<JustifyAbsenceScreen> {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'Para atestados, envie uma foto legível do documento completo, com data e assinatura do profissional.',
+              'Se tiver atestado ou comprovante, entregue o documento diretamente ao RH.',
               style: AppTextStyles.captionRegular12(color: AppColors.foreground),
             ),
           ),
