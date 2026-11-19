@@ -38,6 +38,13 @@ class Justificativa {
   final StatusJustificativa? status;
   final DateTime? criadoEm;
 
+  /// Versão do registro no servidor (controle de concorrência): é o que a
+  /// API pede em `PUT /api/ausencias/{id}` e `DELETE /api/ausencias/{id}`
+  /// pra recusar (409) uma alteração feita sobre um retrato desatualizado.
+  /// O app ainda não edita nem cancela justificativas; 0 se o servidor não
+  /// mandar o campo.
+  final int versao;
+
   const Justificativa({
     required this.id,
     required this.tipo,
@@ -46,12 +53,14 @@ class Justificativa {
     required this.descricao,
     required this.status,
     required this.criadoEm,
+    this.versao = 0,
   });
 
   factory Justificativa.fromJson(Map<String, dynamic> json) {
     final tipo = json['tipo'];
     final status = json['status'];
     final criadoEm = json['criadoEm'];
+    final versao = json['versao'];
     return Justificativa(
       id: json['id'] as int,
       tipo: tipo is int && tipo >= 0 && tipo < TipoAusencia.values.length
@@ -64,9 +73,16 @@ class Justificativa {
           ? StatusJustificativa.values[status]
           : null,
       criadoEm: criadoEm is String ? paraBrasilia(lerInstanteApi(criadoEm)) : null,
+      versao: versao is int ? versao : 0,
     );
   }
 }
+
+/// Mostrada quando a API recusa (409) uma justificativa igual a outra que
+/// ainda está com o RH — mesmo tipo e mesma data, Enviada ou Em análise.
+const mensagemJustificativaDuplicada =
+    'Você já enviou uma justificativa desse tipo para essa data, e ela ainda está com o RH. '
+    'Acompanhe o andamento em "Minhas justificativas", no Início.';
 
 /// Fala com as rotas /api/ausencias do backend. Erros chegam como
 /// [ApiException] (inclusive as validações que a API devolve com 400) ou
@@ -76,6 +92,8 @@ class AusenciaService {
 
   /// [tipo] é o índice 0..3 — mesma ordem da tela (Atestado médico, Falta
   /// justificada, Esquecimento de ponto, Outro motivo) e de [TipoAusencia].
+  /// [descricao] já deve vir limpa (ver `limparTexto`). Uma justificativa
+  /// repetida vira [ApiException] com [mensagemJustificativaDuplicada].
   Future<void> criar({
     required String token,
     required int tipo,
@@ -83,18 +101,30 @@ class AusenciaService {
     required bool diaInteiro,
     required String descricao,
   }) async {
-    await _api.post(
-      '/api/ausencias',
-      token: token,
-      corpo: {
-        'tipo': tipo,
-        'data': data.toIso8601String(),
-        'diaInteiro': diaInteiro,
-        'descricao': descricao,
-      },
-      mensagemPadrao: 'Não foi possível enviar a justificativa.',
-    );
+    try {
+      await _api.post(
+        '/api/ausencias',
+        token: token,
+        corpo: {
+          'tipo': tipo,
+          // Só a data de calendário: com hora/fuso, o servidor poderia
+          // converter e gravar no dia anterior.
+          'data': _dataSemHora(data),
+          'diaInteiro': diaInteiro,
+          'descricao': descricao,
+        },
+        mensagemPadrao: 'Não foi possível enviar a justificativa.',
+      );
+    } on SessaoExpiradaException {
+      rethrow;
+    } on ApiException catch (e) {
+      if (e.statusCode == 409) throw ApiException(mensagemJustificativaDuplicada, statusCode: 409);
+      rethrow;
+    }
   }
+
+  static String _dataSemHora(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
   /// Justificativas do próprio usuário, das mais recentes pras mais antigas.
   Future<List<Justificativa>> listarMinhas(String token) async {

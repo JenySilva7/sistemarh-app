@@ -16,7 +16,7 @@ class ProfileHeader extends StatelessWidget {
     required this.nome,
     required this.cargoDepartamento,
     required this.desde,
-    this.initials = 'JS',
+    required this.initials,
   });
 
   @override

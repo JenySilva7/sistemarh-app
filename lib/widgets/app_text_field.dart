@@ -4,7 +4,7 @@ import '../theme/app_text_styles.dart';
 
 /// Campo de texto padrão do app — fundo #F8F9FA, borda 1px, radius 12,
 /// anel de foco na cor primária. Serve tanto para campo de uma linha quanto
-/// para textarea (via [maxLines]).
+/// para textarea (via [maxLines]) e campo de senha (via [obscureText]).
 class AppTextField extends StatelessWidget {
   final TextEditingController controller;
   final String hint;
@@ -15,6 +15,8 @@ class AppTextField extends StatelessWidget {
   final Widget? prefixIcon;
   final TextInputType? keyboardType;
   final ValueChanged<String>? onChanged;
+  final bool obscureText;
+  final Widget? suffixIcon;
 
   const AppTextField({
     super.key,
@@ -27,6 +29,8 @@ class AppTextField extends StatelessWidget {
     this.prefixIcon,
     this.keyboardType,
     this.onChanged,
+    this.obscureText = false,
+    this.suffixIcon,
   });
 
   @override
@@ -43,12 +47,17 @@ class AppTextField extends StatelessWidget {
       onTap: onTap,
       keyboardType: keyboardType,
       onChanged: onChanged,
+      obscureText: obscureText,
+      // Senha vai como foi digitada: sem correção nem sugestão do teclado.
+      autocorrect: !obscureText,
+      enableSuggestions: !obscureText,
       style: AppTextStyles.bodyRegular16(),
       cursorColor: AppColors.primary,
       decoration: InputDecoration(
         hintText: hint,
         hintStyle: AppTextStyles.bodyRegular16(color: AppColors.foreground.withValues(alpha: 0.5)),
         prefixIcon: prefixIcon,
+        suffixIcon: suffixIcon,
         filled: true,
         fillColor: AppColors.background,
         counterStyle: AppTextStyles.captionRegular12(),

@@ -8,6 +8,8 @@ import '../theme/app_text_styles.dart';
 class AbaHeader extends StatelessWidget {
   final String titulo;
   final String subtitulo;
+
+  /// Iniciais do usuário logado, pro avatar (ver `Sessao.iniciais`).
   final String initials;
 
   /// Se true, deixa espaço extra embaixo para um card seguinte se sobrepor
@@ -18,7 +20,7 @@ class AbaHeader extends StatelessWidget {
     super.key,
     required this.titulo,
     required this.subtitulo,
-    this.initials = 'JS',
+    required this.initials,
     this.comSobreposicao = true,
   });
 

@@ -11,16 +11,19 @@ class ValorMensal {
 }
 
 /// Card de Histórico — um mês (holerite ou vale alimentação) com até 3
-/// valores lado a lado e um botão "Exportar PDF".
+/// valores lado a lado, uma linha de [detalhe] opcional embaixo e, se
+/// [onExportar] for informado, um botão de exportar.
 class MonthlySummaryCard extends StatelessWidget {
   final String mes;
   final List<ValorMensal> valores;
+  final String? detalhe;
   final VoidCallback? onExportar;
 
   const MonthlySummaryCard({
     super.key,
     required this.mes,
     required this.valores,
+    this.detalhe,
     this.onExportar,
   });
 
@@ -78,6 +81,10 @@ class MonthlySummaryCard extends StatelessWidget {
               ],
             ],
           ),
+          if (detalhe != null) ...[
+            const SizedBox(height: 10),
+            Text(detalhe!, style: AppTextStyles.captionRegular12()),
+          ],
         ],
       ),
     );

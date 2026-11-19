@@ -77,10 +77,28 @@ class Sessao {
     final minutos = totalMinutos % 60;
     return '$sinal${horas}h${minutos.toString().padLeft(2, '0')}';
   }
+
+  /// A mesma sessão com outro token (ex.: o novo, depois de trocar a senha).
+  Sessao comToken(String novoToken) => Sessao(
+    token: novoToken,
+    id: id,
+    nome: nome,
+    email: email,
+    cargo: cargo,
+    departamento: departamento,
+    saldoBancoHorasMinutos: saldoBancoHorasMinutos,
+    funcionarioId: funcionarioId,
+    dataAdmissao: dataAdmissao,
+    gerenteNome: gerenteNome,
+    totalSolicitacoesAusencia: totalSolicitacoesAusencia,
+  );
 }
 
 /// Fala com as rotas /api/auth do backend. Erros chegam como [ApiException]
 /// (ou [SessaoExpiradaException], no caso de [me] com token recusado).
+///
+/// Não existe cadastro pelo app: quem cria o acesso do colaborador é o RH,
+/// pelo painel.
 class AuthService {
   final ApiClient _api = ApiClient();
 
@@ -93,17 +111,36 @@ class AuthService {
     return lerResposta(corpo, (json) => Sessao.fromJson(json as Map<String, dynamic>));
   }
 
-  Future<Sessao> registrar({
-    required String nome,
-    required String email,
-    required String senha,
-  }) async {
-    final corpo = await _api.post(
-      '/api/auth/register',
-      corpo: {'nome': nome, 'email': email, 'senha': senha},
-      mensagemPadrao: 'Não foi possível concluir o cadastro.',
+  /// Encerra a sessão no servidor: o backend invalida todos os tokens desse
+  /// usuário, então um token copiado do aparelho também deixa de valer.
+  /// O tempo limite é curto porque quem chama apaga o token local de
+  /// qualquer jeito — servidor fora do ar não pode prender ninguém no app.
+  Future<void> logout(String token) async {
+    await _api.post(
+      '/api/auth/logout',
+      token: token,
+      mensagemPadrao: 'Não foi possível encerrar a sessão no servidor.',
+      timeout: const Duration(seconds: 5),
     );
-    return lerResposta(corpo, (json) => Sessao.fromJson(json as Map<String, dynamic>));
+  }
+
+  /// Troca a senha do próprio usuário (`PUT /api/auth/senha`) e devolve o
+  /// token NOVO: o servidor invalida todos os tokens antigos dessa conta,
+  /// inclusive o deste aparelho, então quem chama precisa passar a usar o
+  /// novo. Senha atual errada vem como [ApiException] 400 ("Senha atual
+  /// incorreta."); tentativas demais, como 429 — sempre com a mensagem da API.
+  Future<String> alterarSenha({required String token, required String senhaAtual, required String novaSenha}) async {
+    final corpo = await _api.put(
+      '/api/auth/senha',
+      token: token,
+      corpo: {'senhaAtual': senhaAtual, 'novaSenha': novaSenha},
+      mensagemPadrao: 'Não foi possível alterar a senha.',
+    );
+    return lerResposta(corpo, (json) {
+      final novo = (json as Map<String, dynamic>)['token'];
+      if (novo is! String || novo.trim().isEmpty) throw const FormatException('Resposta sem token.');
+      return novo;
+    });
   }
 
   /// Rehidrata a sessão a partir de um token já salvo (ver [SessionStorage]),

@@ -29,7 +29,6 @@ class HomeScreen extends StatefulWidget {
   final JustificativasController justificativas;
   final VoidCallback onJustificarAusencia;
   final VoidCallback onBancoDeHoras;
-  final VoidCallback onSessaoExpirada;
 
   const HomeScreen({
     super.key,
@@ -38,7 +37,6 @@ class HomeScreen extends StatefulWidget {
     required this.justificativas,
     required this.onJustificarAusencia,
     required this.onBancoDeHoras,
-    required this.onSessaoExpirada,
   });
 
   @override
@@ -48,11 +46,9 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   static const _maxJustificativas = 5;
 
-  bool _registrando = false;
-
   Future<void> _registrarPonto() async {
-    if (_registrando || widget.ponto.proximo == null) return;
-    setState(() => _registrando = true);
+    // O controller ignora o toque se outro registro ainda estiver a caminho
+    // (devolve null), então um toque duplo vira um registro só.
     try {
       final msg = await widget.ponto.registrarProximo();
       if (msg == null || !mounted) return;
@@ -63,15 +59,17 @@ class _HomeScreenState extends State<HomeScreen> {
         description: msg,
       );
     } on SessaoExpiradaException {
-      widget.onSessaoExpirada();
+      // O ApiClient já está levando de volta pro login.
     } on ApiException catch (e) {
       if (!mounted) return;
-      AppToast.show(context, title: 'Não foi possível registrar', description: e.mensagem);
+      // A mensagem do servidor explica o motivo (ex.: "Aguarde 1 minuto entre
+      // registros de ponto."). Recarrega os registros porque a tela pode
+      // estar desatualizada (ex.: ponto batido em outro aparelho).
+      AppToast.show(context, title: 'Não foi possível registrar', description: e.mensagem, erro: true);
+      if (e.statusCode == 400 || e.statusCode == 409) widget.ponto.recarregar();
     } catch (_) {
       if (!mounted) return;
-      AppToast.show(context, title: 'Não foi possível registrar', description: mensagemErroInesperado);
-    } finally {
-      if (mounted) setState(() => _registrando = false);
+      AppToast.show(context, title: 'Não foi possível registrar', description: mensagemErroInesperado, erro: true);
     }
   }
 

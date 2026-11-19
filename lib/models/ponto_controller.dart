@@ -26,7 +26,7 @@ extension TipoRegistroLabel on TipoRegistro {
 /// ponto, o horário é definitivo (reflete como ponto eletrônico funciona na
 /// vida real, e é assim que o backend trata isso também).
 class PontoController extends ChangeNotifier {
-  PontoController({required String token, this.onSessaoExpirada}) : _token = token {
+  PontoController({required this._token}) {
     _timer = Timer.periodic(const Duration(seconds: 1), (_) => _notificar());
     recarregar();
   }
@@ -37,10 +37,8 @@ class PontoController extends ChangeNotifier {
 
   final String _token;
   final PontoService _service = PontoService();
-
-  /// Chamado quando o servidor recusa o token ao carregar os registros.
-  final VoidCallback? onSessaoExpirada;
   bool _descartado = false;
+  bool _registrando = false;
 
   final Map<TipoRegistro, DateTime?> _registros = {
     TipoRegistro.entrada: null,
@@ -61,6 +59,10 @@ class PontoController extends ChangeNotifier {
   /// ar) — o usuário ainda consegue tentar registrar, que vai falhar com o
   /// próprio erro de conexão nessa hora.
   String? get erroCarregamento => _erroCarregamento;
+
+  /// true enquanto um registro de ponto está a caminho do servidor — o botão
+  /// fica travado nesse meio tempo.
+  bool get registrando => _registrando;
 
   DateTime? registroDe(TipoRegistro tipo) => _registros[tipo];
 
@@ -142,7 +144,7 @@ class PontoController extends ChangeNotifier {
       }
       _erroCarregamento = null;
     } on SessaoExpiradaException {
-      onSessaoExpirada?.call();
+      // O ApiClient já está levando de volta pro login.
     } on ApiException catch (e) {
       _erroCarregamento = e.mensagem;
     } catch (_) {
@@ -158,21 +160,32 @@ class PontoController extends ChangeNotifier {
   }
 
   /// Registra o próximo ponto pendente contra a API e retorna uma mensagem
-  /// de toast, ou null se a jornada já estava concluída. Lança
-  /// [ApiException] (ou [SessaoExpiradaException]) em caso de erro — quem
-  /// chama decide como mostrar.
+  /// de toast, ou null se nada foi enviado (jornada já concluída ou outro
+  /// registro ainda a caminho). Lança [ApiException] (ou
+  /// [SessaoExpiradaException]) em caso de erro — quem chama decide como
+  /// mostrar; a mensagem do servidor (ex.: a espera de 1 minuto entre
+  /// registros) vem pronta em [ApiException.mensagem].
+  ///
+  /// A trava fica aqui, e não só no botão: um toque duplo chega duas vezes
+  /// antes de a tela redesenhar o botão desabilitado, e só a primeira pode
+  /// virar requisição.
   Future<String?> registrarProximo() async {
-    if (proximo == null) return null;
-    final registro = await _service.registrarProximo(_token);
-    _registrosFeitos++;
-    _registros[registro.tipo] = registro.registradoEm;
-    final hora = TimeOfDay.fromDateTime(registro.registradoEm).format24();
-    final dia = _diaSemanaCurto(registro.registradoEm.weekday);
-    final msg = registro.tipo == TipoRegistro.saida
-        ? 'Saída às $hora · $dia'
-        : '${registro.tipo.titulo} registrada às $hora';
+    if (_registrando || proximo == null) return null;
+    _registrando = true;
     _notificar();
-    return msg;
+    try {
+      final registro = await _service.registrarProximo(_token);
+      _registrosFeitos++;
+      _registros[registro.tipo] = registro.registradoEm;
+      final hora = TimeOfDay.fromDateTime(registro.registradoEm).format24();
+      final dia = _diaSemanaCurto(registro.registradoEm.weekday);
+      return registro.tipo == TipoRegistro.saida
+          ? 'Saída às $hora · $dia'
+          : '${registro.tipo.titulo} registrada às $hora';
+    } finally {
+      _registrando = false;
+      _notificar();
+    }
   }
 
   String get ultimoRegistroLabel {

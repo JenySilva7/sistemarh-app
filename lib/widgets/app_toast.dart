@@ -5,7 +5,8 @@ import '../theme/app_text_styles.dart';
 
 /// Toast flutuante no topo da tela — card escuro com ícone de confirmação,
 /// título, descrição e uma ação opcional (ex.: "Desfazer"), replicando o
-/// componente "App / Toast" do design system.
+/// componente "App / Toast" do design system. Com [erro], o ícone vira o de
+/// alerta, pra uma falha não parecer confirmação.
 class AppToast {
   static void show(
     BuildContext context, {
@@ -13,6 +14,7 @@ class AppToast {
     required String description,
     String? actionLabel,
     VoidCallback? onAction,
+    bool erro = false,
   }) {
     final overlay = Overlay.of(context, rootOverlay: true);
     late OverlayEntry entry;
@@ -22,6 +24,7 @@ class AppToast {
       builder: (ctx) => _ToastWidget(
         title: title,
         description: description,
+        erro: erro,
         actionLabel: actionLabel,
         topInset: MediaQuery.of(ctx).padding.top,
         controller: controller,
@@ -47,6 +50,7 @@ class _ToastController {
 class _ToastWidget extends StatefulWidget {
   final String title;
   final String description;
+  final bool erro;
   final String? actionLabel;
   final double topInset;
   final _ToastController controller;
@@ -56,6 +60,7 @@ class _ToastWidget extends StatefulWidget {
   const _ToastWidget({
     required this.title,
     required this.description,
+    required this.erro,
     required this.actionLabel,
     required this.topInset,
     required this.controller,
@@ -108,53 +113,61 @@ class _ToastWidgetState extends State<_ToastWidget> with SingleTickerProviderSta
       top: widget.topInset + 8,
       left: 16,
       right: 16,
-      child: SlideTransition(
-        position: _offset,
-        child: Material(
-          color: Colors.transparent,
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-            decoration: BoxDecoration(
-              color: AppColors.sidebarBg,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.35),
-                  blurRadius: 30,
-                  offset: const Offset(0, 10),
-                  spreadRadius: -8,
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                const Icon(LucideIcons.circleCheck, size: 24, color: AppColors.success),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(widget.title, style: AppTextStyles.valorResumo(color: AppColors.white)),
-                      const SizedBox(height: 2),
-                      Text(
-                        widget.description,
-                        style: AppTextStyles.captionRegular12(color: AppColors.whiteOverlay80),
-                      ),
-                    ],
+      // Sem ação, o toast só informa: o toque passa direto pra tela de baixo.
+      // Senão, por 4 s ele "come" os toques no topo da tela — por exemplo, no
+      // botão de bater ponto quando o Início está rolado pra baixo.
+      child: IgnorePointer(
+        ignoring: widget.onAction == null,
+        child: SlideTransition(
+          position: _offset,
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+              decoration: BoxDecoration(
+                color: AppColors.sidebarBg,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.35),
+                    blurRadius: 30,
+                    offset: const Offset(0, 10),
+                    spreadRadius: -8,
                   ),
-                ),
-                if (widget.actionLabel != null)
-                  GestureDetector(
-                    onTap: widget.onAction,
-                    child: Padding(
-                      padding: const EdgeInsets.only(left: 8),
-                      child: Text(
-                        widget.actionLabel!,
-                        style: AppTextStyles.smallMedium14(color: AppColors.primaryLight),
-                      ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  widget.erro
+                      ? const Icon(LucideIcons.circleAlert, size: 24, color: AppColors.danger)
+                      : const Icon(LucideIcons.circleCheck, size: 24, color: AppColors.success),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(widget.title, style: AppTextStyles.valorResumo(color: AppColors.white)),
+                        const SizedBox(height: 2),
+                        Text(
+                          widget.description,
+                          style: AppTextStyles.captionRegular12(color: AppColors.whiteOverlay80),
+                        ),
+                      ],
                     ),
                   ),
-              ],
+                  if (widget.actionLabel != null)
+                    GestureDetector(
+                      onTap: widget.onAction,
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 8),
+                        child: Text(
+                          widget.actionLabel!,
+                          style: AppTextStyles.smallMedium14(color: AppColors.primaryLight),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         ),

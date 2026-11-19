@@ -43,6 +43,8 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _entrar() async {
+    // O Enter do teclado chama aqui direto, sem passar pelo botão travado.
+    if (_carregando) return;
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
     setState(() {

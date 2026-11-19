@@ -5,15 +5,12 @@ import '../services/ausencia_service.dart';
 /// Estado da lista "Minhas justificativas" do Início, vinda de
 /// `GET /api/ausencias` (só as do próprio usuário, mais recentes primeiro).
 class JustificativasController extends ChangeNotifier {
-  JustificativasController({required this.token, this.onSessaoExpirada}) {
+  JustificativasController({required this.token}) {
     recarregar();
   }
 
   final String token;
   final AusenciaService _service = AusenciaService();
-
-  /// Chamado quando o servidor recusa o token.
-  final VoidCallback? onSessaoExpirada;
 
   List<Justificativa> _itens = const [];
   bool _carregando = true;
@@ -36,7 +33,7 @@ class JustificativasController extends ChangeNotifier {
     try {
       lista = await _service.listarMinhas(token);
     } on SessaoExpiradaException {
-      onSessaoExpirada?.call();
+      // O ApiClient já está levando de volta pro login.
       return;
     } on ApiException catch (e) {
       erro = e.mensagem;

@@ -5,6 +5,8 @@ import '../services/ausencia_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../utils/formatters.dart';
+import '../utils/horario_brasilia.dart';
+import '../utils/validacao.dart';
 import '../widgets/app_text_field.dart';
 import '../widgets/option_card.dart';
 
@@ -26,10 +28,7 @@ const _tipos = [
 class JustifyAbsenceScreen extends StatefulWidget {
   final String token;
 
-  /// Chamado se o servidor recusar o token ao enviar.
-  final VoidCallback onSessaoExpirada;
-
-  const JustifyAbsenceScreen({super.key, required this.token, required this.onSessaoExpirada});
+  const JustifyAbsenceScreen({super.key, required this.token});
 
   @override
   State<JustifyAbsenceScreen> createState() => _JustifyAbsenceScreenState();
@@ -51,13 +50,23 @@ class _JustifyAbsenceScreenState extends State<JustifyAbsenceScreen> {
     super.dispose();
   }
 
+  /// "Hoje" em Brasília, o mesmo dia que a API usa pra conferir a faixa de
+  /// datas aceitas — e não o do fuso configurado no aparelho.
+  static DateTime _hoje() {
+    final agora = agoraBrasilia();
+    return DateTime(agora.year, agora.month, agora.day);
+  }
+
   Future<void> _escolherData() async {
-    final agora = DateTime.now();
+    final hoje = _hoje();
+    final primeira = primeiraDataAusencia(hoje);
+    final ultima = ultimaDataAusencia(hoje);
+    final atual = _data;
     final escolhida = await showDatePicker(
       context: context,
-      initialDate: _data ?? agora,
-      firstDate: DateTime(agora.year - 1),
-      lastDate: DateTime(agora.year + 1),
+      initialDate: atual == null || atual.isBefore(primeira) || atual.isAfter(ultima) ? hoje : atual,
+      firstDate: primeira,
+      lastDate: ultima,
       helpText: 'Data da ausência',
       cancelText: 'Cancelar',
       confirmText: 'Confirmar',
@@ -88,12 +97,12 @@ class _JustifyAbsenceScreenState extends State<JustifyAbsenceScreen> {
   }
 
   Future<void> _enviar() async {
-    if (_data == null) {
-      _avisar('Selecione a data da ausência.');
-      return;
-    }
-    if (_descricaoCtrl.text.trim().isEmpty) {
-      _avisar('Descreva o motivo da ausência.');
+    // Um toque duplo chega aqui duas vezes antes de o botão ser redesenhado
+    // desabilitado: só o primeiro envia.
+    if (_enviando) return;
+    final erro = validarDataAusencia(_data, _hoje()) ?? validarDescricaoAusencia(_descricaoCtrl.text);
+    if (erro != null) {
+      _avisar(erro);
       return;
     }
 
@@ -104,13 +113,16 @@ class _JustifyAbsenceScreenState extends State<JustifyAbsenceScreen> {
         tipo: _tipo,
         data: _data!,
         diaInteiro: _diaInteiro,
-        descricao: _descricaoCtrl.text.trim(),
+        // Texto longo: as quebras de linha digitadas são mantidas.
+        descricao: limparTexto(_descricaoCtrl.text, regraDescricaoAusencia),
       );
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } on SessaoExpiradaException {
-      widget.onSessaoExpirada();
+      // O ApiClient já está levando de volta pro login.
     } on ApiException catch (e) {
+      // Inclui o 409 de justificativa repetida, já com a mensagem própria
+      // (ver mensagemJustificativaDuplicada).
       if (mounted) _avisar(e.mensagem);
     } catch (_) {
       if (mounted) _avisar(mensagemErroInesperado);
@@ -135,7 +147,8 @@ class _JustifyAbsenceScreenState extends State<JustifyAbsenceScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Envie o motivo da sua ausência para análise do RH. Você será avisado quando houver uma resposta.',
+                      'Envie o motivo da sua ausência para análise do RH. Acompanhe a resposta em '
+                      '"Minhas justificativas", no Início.',
                       style: AppTextStyles.smallRegular14(),
                     ),
                     const SizedBox(height: 22),
@@ -156,7 +169,12 @@ class _JustifyAbsenceScreenState extends State<JustifyAbsenceScreen> {
                     const SizedBox(height: 22),
                     _campo(
                       'Descrição',
-                      AppTextField(controller: _descricaoCtrl, hint: 'Descreva o motivo da ausência…', maxLines: 4),
+                      AppTextField(
+                        controller: _descricaoCtrl,
+                        hint: 'Descreva o motivo da ausência…',
+                        maxLines: 4,
+                        maxLength: regraDescricaoAusencia.maximo,
+                      ),
                     ),
                     const SizedBox(height: 20),
                     _buildAviso(),
@@ -182,6 +200,8 @@ class _JustifyAbsenceScreenState extends State<JustifyAbsenceScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: AppColors.white,
+                disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.7),
+                disabledForegroundColor: AppColors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 elevation: 0,

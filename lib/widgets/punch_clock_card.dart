@@ -8,7 +8,9 @@ import '../utils/horario_brasilia.dart';
 import 'status_chip.dart';
 
 /// Card do Relógio — relógio ao vivo, status do expediente, progresso da
-/// jornada e botão de ação principal (próximo ponto a registrar).
+/// jornada e botão de ação principal (próximo ponto a registrar). O botão
+/// fica travado, com indicador de progresso, enquanto
+/// [PontoController.registrando].
 class PunchClockCard extends StatefulWidget {
   final PontoController controller;
   final VoidCallback onRegistrar;
@@ -127,10 +129,12 @@ class _PunchClockCardState extends State<PunchClockCard> {
                     ),
                   )
                 : ElevatedButton(
-                    onPressed: widget.onRegistrar,
+                    onPressed: c.registrando ? null : widget.onRegistrar,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: AppColors.white,
+                      disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.7),
+                      disabledForegroundColor: AppColors.white,
                       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       elevation: 0,
@@ -141,11 +145,18 @@ class _PunchClockCardState extends State<PunchClockCard> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
-                          c.proximo!.isEntrada ? LucideIcons.logIn : LucideIcons.logOut,
-                          size: 20,
-                          color: AppColors.white,
-                        ),
+                        if (c.registrando)
+                          const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2.2, color: AppColors.white),
+                          )
+                        else
+                          Icon(
+                            c.proximo!.isEntrada ? LucideIcons.logIn : LucideIcons.logOut,
+                            size: 20,
+                            color: AppColors.white,
+                          ),
                         const SizedBox(width: 8),
                         Flexible(
                           child: Text(
